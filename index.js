@@ -1,16 +1,17 @@
 const axios = require('axios');
 const cron = require("node-cron");
 const {google} = require('googleapis');
-const sheets = google.sheets('v4');
+// const sheets = google.sheets('v4');
 const cheerio = require('cheerio');
 const dayjs = require('dayjs');
 //const dataModel = require('./model.js');
 //const mongoose = require('mongoose');
 
 
-/////////////////////////////////////////
-//bir database'e bağlanmak istenirse >>>
-/////////////////////////////////////////
+//////////////////////////////////////////////////////
+//      bir database'e bağlanmak istenirse >>>      //
+//////////////////////////////////////////////////////
+
 /* mongoose.connect('mongodb://127.0.0.1/weatherApp', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -92,21 +93,42 @@ const url = ["https://tr.weatherspark.com/td/94320/%C4%B0zmir-T%C3%BCrkiye-Ortal
 console.log("#########################################################################################" + "\n"
  + "#########################################################################################" + "\n" 
  + "###########################                                   ###########################" + "\n" 
- + "###########################        PROGRAM STARTS HERE        ###########################"+ "\n"
+ + "###########################        WEATHER APP v3.0           ###########################"+ "\n"
  + "###########################                                   ###########################" + "\n"
  + "#########################################################################################" + "\n"
  + "#########################################################################################" + "\n\n"
  );
 
 
-// şimdilik her dakika her şehir için random saniye aralıklarında çalışıyor
-// canlı'da dakikalar da randomize edilebilir? böylece her saat ya da her gün belirli saatlerde random şekilde çalışabilir
+//  şimdilik her dakika her şehir için semi-random saniye aralıklarında çalışıyor
+//  dakikalar da randomize edilebilir? böylece her saat ya da her gün belirli saatlerde random şekilde çalışabilir
+//
+//      Seconds: 0-59
+//      Minutes: 0-59
+//      Hours: 0-23
+//      Day of Month: 1-31
+//      Months: 0-11 (Jan-Dec)
+//      Day of Week: 0-6 (Sun-Sat)
+
 async function getData(url, randomSecond) {
     cron.schedule(`${randomSecond} * * * * *`, () => {
 
-        // datetime formatlama
-        let today = dayjs();
-        dateToday = today.format("DD-MM-YYYY");
+        // datetime formatting
+        // if date is not 'td' TODAY, changes it to the required date
+        justAList = url.split("/");
+        if(justAList[3] == 'td'){
+            today = dayjs();
+            dateToday = today.format("DD-MM-YYYY");
+        }
+        else{
+            monthFromUrl = justAList[5];
+            dayFromUrl = justAList[6];
+            let today = dayjs().set('date', dayFromUrl).set('month', monthFromUrl-1);
+            dateToday = today.format("DD-MM-YYYY");
+        }
+
+
+        console.log(dateToday);
         // random header
         userAgentHeader = userAgents[Math.floor(Math.random() * userAgents.length)]
         // gönderilen userAgent istenirse data olarak pass'lanabilir
@@ -179,7 +201,6 @@ async function getData(url, randomSecond) {
 
                 }
 
-
                 authAndAppend();
 
             ///////////// error handling
@@ -191,6 +212,9 @@ async function getData(url, randomSecond) {
 }
 
 
+
+
+
 function getRandomInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
@@ -198,14 +222,87 @@ function getRandomInt(min, max) {
 }
 
 
-
+// bugünün derecelerini almak için
 // her dakika başı belirtilen saniyeler arasında semi-random şekilde çalışıyor
 function getCityAndDatas (url) {
     getData(url[0], getRandomInt(0,10));
-    getData(url[1], getRandomInt(15,25));
+    getData(url[1], getRandomInt(15,25));   // takes a list which contains the required url's, passes random integers to the func to randomize time
     getData(url[2], getRandomInt(30,40));
     getData(url[3], getRandomInt(45,55));
 }
 
 getCityAndDatas(url);
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//      CODE BELOW IS TO GET PAST DATA      ||      CODE BELOW IS TO GET PAST DATA      ||      CODE BELOW IS TO GET PAST DATA      // 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function getPastData(urlList){
+    for (i in urlList){
+        getData(urlList[i], i+5)
+    }
+    return
+}
+
+// MM-DD-YYYY is the date format
+// takes the startDate, endDate and the cityName, returns the requires url's for the given parameters
+function urlListGenerator (startDate, endDate, cityName) {
+
+    function getDatesInRange(sDate, eDate) {
+
+        const date = new Date(sDate.getTime());
+        const dates = [];
+        while (date <= eDate) {
+            dates.push(new Date(date));
+            date.setDate(date.getDate() + 1);
+        }
+    
+        return dates;
+    }
+    dateList = getDatesInRange(startDate, endDate);
+    months = ["Ocak",
+                "Şubat",
+                "Mart",
+                "Nisan",
+                "Mayıs",
+                "Haziran",
+                "Temmuz",
+                "Ağustos",
+                "Eylül",
+                "Ekim",
+                "Kasım",
+                "Aralık"]
+    urlList = [];
+    for (i in dateList){
+        let day = dateList[i].getDate();
+        let month = dateList[i].getMonth();
+        cityList = ['İzmir', 'İstanbul', 'Ankara', 'Bursa'];
+        codeList = ['94320', '95434', '97345', '96052'];
+        urlList[i] = encodeURI(`https://tr.weatherspark.com/d/${codeList[cityList.indexOf(cityName)]}/${month+1}/${day}/${day}-${months[month]}-tarihinde-${cityName}-T%C3%BCrkiye-Ortalama-Hava-Durumu`)
+        // example url: https://tr.weatherspark.com/d/94320/8/4/4-A%C4%9Fustos-tarihinde-%C4%B0zmir-T%C3%BCrkiye-Ortalama-Hava-Durumu
+    }
+  return urlList
+} 
+
+
+
+
+
+// MM-DD-YYYY
+// START(d1) AND ENDDATE(d2) 
+// const d1 = new Date('06-01-2022');
+// const d2 = new Date('06-05-2022');
+
+
+// getPastData(urlListGenerator(d1, d2, "İzmir"));
+// getPastData(urlListGenerator(d1, d2, "İstanbul"));
+// getPastData(urlListGenerator(d1, d2, "Ankara"));
+// getPastData(urlListGenerator(d1, d2, "Bursa"));
 
